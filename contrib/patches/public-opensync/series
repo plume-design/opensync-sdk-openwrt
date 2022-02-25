@@ -1,0 +1,12 @@
+0008-kernel-fix-crashlog-for-ARM.patch
+0016-include-prereq-build.mk-add-ovsdb-tool-dependency.patch
+0020-base-files-set-default-password-to-openwrt.patch
+0025-ipq807x-buildsystem-patches-required-by-the-target.patch
+0026-base-files-make-sysupgrade-work-on-qcom-AX.patch
+0028-scripts-ubinize-image.sh-allow-setting-the-rootfs-na.patch
+0029-busybox-enable-the-watchdog-tool.patch
+0030-linux-modules-fix-some-v4.4-dependencies.patch
+0031-base-files-add-support-for-v4.4-style-netdev-led-tri.patch
+0051-config-firewall-opensync-adaptation.patch
+0052-dnsmasq-opensync-adaptation.patch
+0053-iproute2-opensync-adaptation.patch

@@ -1,0 +1,17 @@
++From: aparna.salian <aparna.salian@globaledgesoft.com>
++Subject: [PATCH] net/mac80211: Increase nullfunc tx tries
+
+max_nullfunc_tries count increased from 2 to 4 to reduce frequency of 
+backhaul sta disconnections. 
+
+--- a/net/mac80211/mlme.c
++++ b/net/mac80211/mlme.c
+@@ -42,7 +42,7 @@
+ #define IEEE80211_ASSOC_TIMEOUT_SHORT	(HZ / 10)
+ #define IEEE80211_ASSOC_MAX_TRIES	3
+ 
+-static int max_nullfunc_tries = 2;
++static int max_nullfunc_tries = 4;
+ module_param(max_nullfunc_tries, int, 0644);
+ MODULE_PARM_DESC(max_nullfunc_tries,
+ 		 "Maximum nullfunc tx tries before disconnecting (reason 4).");

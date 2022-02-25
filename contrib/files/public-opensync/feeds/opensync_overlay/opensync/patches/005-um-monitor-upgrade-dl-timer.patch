@@ -1,0 +1,13 @@
+From: aparna.salian <aparna.salian@globaledgesoft.com>
+Subject: [PATCH] um: Monitor upgrade_dl_timer
+
+--- a/src/um/src/um_ovsdb.c
++++ b/src/um/src/um_ovsdb.c
+@@ -433,6 +433,7 @@ bool um_ovsdb()
+                          SCHEMA_COLUMN(AWLAN_Node, firmware_url),
+                          SCHEMA_COLUMN(AWLAN_Node, firmware_pass),
+                          SCHEMA_COLUMN(AWLAN_Node, upgrade_timer),
++                         SCHEMA_COLUMN(AWLAN_Node, upgrade_dl_timer),
+                          NULL };
+     /*
+      * Connect to the database

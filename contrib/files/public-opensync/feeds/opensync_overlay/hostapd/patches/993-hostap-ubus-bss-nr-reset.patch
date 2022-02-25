@@ -1,0 +1,14 @@
+From: aparna.salian <aparna.salian@globaledgesoft.com>
+Subject: [PATCH] hostapd/src/ap: Fix for ubus crash on chan switch 
+to DFS channel
+
+--- a/src/ap/ubus.c
++++ b/src/ap/ubus.c
+@@ -1454,6 +1454,7 @@ void hostapd_ubus_free_bss(struct hostap
+ 		os_free(bss_lst[i]);
+ 	free(bss_lst);
+ 	bss_lst = NULL;
++	bss_nr = 0;
+ }
+ 
+ static int hostapd_get_bss_list(struct ubus_context *ctx,

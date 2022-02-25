@@ -1,0 +1,27 @@
+From 3b41ef5ef1988af0e2049471172038f089cdf8a5 Mon Sep 17 00:00:00 2001
+From: Miroslav Rajsek <mrajsek@plume.com>
+Date: Thu, 12 Aug 2021 14:52:03 +0200
+Subject: [PATCH] iproute2 opensync adaptation
+
+---
+ package/network/utils/iproute2/Makefile | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/package/network/utils/iproute2/Makefile b/package/network/utils/iproute2/Makefile
+index e26a4df81d..82cf572afc 100644
+--- a/package/network/utils/iproute2/Makefile
++++ b/package/network/utils/iproute2/Makefile
+@@ -155,6 +155,10 @@ endef
+ define Package/ip-full/install
+ 	$(INSTALL_DIR) $(1)/usr/libexec
+ 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ip/ip $(1)/usr/libexec/ip-full
++ifdef CONFIG_PACKAGE_opensync
++	$(INSTALL_DIR) $(1)/usr/sbin/
++	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ip/ip $(1)/usr/sbin/ip
++endif
+ endef
+ 
+ define Package/tc/install
+-- 
+2.25.1
+

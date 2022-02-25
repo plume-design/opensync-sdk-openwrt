@@ -1,0 +1,40 @@
+From: aparna.salian <aparna.salian@globaledgesoft.com>
+Subject: [PATCH] hostapd/src: multi VIF reload fix
+
+Reload AP VIFs successfully without deleting externally added 
+interfaces.
+
+--- a/src/ap/hostapd.c
++++ b/src/ap/hostapd.c
+@@ -2140,7 +2140,7 @@ static int hostapd_setup_interface_compl
+ 		hapd = iface->bss[j];
+ 		if (j)
+ 			os_memcpy(hapd->own_addr, prev_addr, ETH_ALEN);
+-		if (hostapd_setup_bss(hapd, j == 0)) {
++		if (hostapd_setup_bss(hapd, (j == 0) ? 1 : -1)) {
+ 			for (;;) {
+ 				hapd = iface->bss[j];
+ 				hostapd_bss_deinit_no_free(hapd);
+--- a/src/drivers/driver_nl80211.c
++++ b/src/drivers/driver_nl80211.c
+@@ -197,6 +197,9 @@ static int nl80211_put_mesh_config(struc
+ static int i802_sta_disassoc(void *priv, const u8 *own_addr, const u8 *addr,
+ 			     u16 reason);
+ 
++static int nl80211_put_freq_params(struct nl_msg *msg,
++				const struct hostapd_freq_params *freq);
++
+ 
+ /* Converts nl80211_chan_width to a common format */
+ enum chan_width convert2width(int width)
+@@ -4488,6 +4491,10 @@ static int wpa_driver_nl80211_set_ap(voi
+ 	}
+ #endif /* CONFIG_IEEE80211AX */
+ 
++	if (params->freq && nl80211_put_freq_params(msg, params->freq))
++		wpa_printf(MSG_DEBUG, "nl80211: Failed to add freq params: %d (%s)",
++			ret, strerror(-ret));
++
+ 	ret = send_and_recv_msgs_owner(drv, msg, get_connect_handle(bss), 1,
+ 				       NULL, NULL);
+ 	if (ret) {

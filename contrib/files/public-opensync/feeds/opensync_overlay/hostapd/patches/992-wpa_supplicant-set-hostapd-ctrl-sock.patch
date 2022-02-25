@@ -1,0 +1,79 @@
+From: aparna.salian <aparna.salian@globaledgesoft.com>
+Subject: [PATCH] hostapd/wpa_supplicant: set hostapd ctrl
+
+Custom command to set hostapd ctrl socket for the wpa_supplicant 
+interface. Required for CSA propagation from STA to AP to avoid 
+disabling of diverging VIFs on mac80211 based devices.
+
+--- a/wpa_supplicant/ctrl_iface.c
++++ b/wpa_supplicant/ctrl_iface.c
+@@ -8914,6 +8914,17 @@ done:
+ }
+ 
+ 
++void wpas_set_hostapd_ctrl(struct wpa_supplicant *wpa_s, char *pos)
++{
++    wpa_s->hostapd = wpa_ctrl_open(pos);
++
++    if (!wpa_s->hostapd) {
++        wpa_printf(MSG_DEBUG, "Failed to connect to hostapd");
++        return;
++    }
++}
++
++
+ #ifdef CONFIG_TESTING_OPTIONS
+ 
+ static void wpas_ctrl_iface_mgmt_tx_cb(struct wpa_supplicant *wpa_s,
+@@ -11212,6 +11223,8 @@ char * wpa_supplicant_ctrl_iface_process
+ 			reply_len = -1;
+ #endif /* CONFIG_DPP2 */
+ #endif /* CONFIG_DPP */
++	} else if (os_strncmp(buf, "HOSTAPD_CTRL ", 13) == 0) {
++		wpas_set_hostapd_ctrl(wpa_s, buf + 13);
+ 	} else {
+ 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
+ 		reply_len = 16;
+--- a/wpa_supplicant/wpa_cli.c
++++ b/wpa_supplicant/wpa_cli.c
+@@ -3116,6 +3116,11 @@ static int wpa_ctrl_command_bss(struct w
+ }
+ 
+ 
++static int wpa_cli_cmd_hostapd_ctrl(struct wpa_ctrl *ctrl, int argc, char *argv[])
++{
++	return wpa_cli_cmd(ctrl, "HOSTAPD_CTRL", 1, argc, argv);
++}
++
+ static int wpa_cli_cmd_all_bss(struct wpa_ctrl *ctrl, int argc, char *argv[])
+ {
+ 	char cmd[64];
+@@ -3801,6 +3806,8 @@ static const struct wpa_cli_cmd wpa_cli_
+ #endif /* CONFIG_DPP */
+ 	{ "all_bss", wpa_cli_cmd_all_bss, NULL, cli_cmd_flag_none,
+ 	  "= list all BSS entries (scan results)" },
++	{ "hostapd_ctrl", wpa_cli_cmd_hostapd_ctrl, NULL, cli_cmd_flag_none,
++	  "= set hostapd ctrl interface" },
+ 	{ NULL, NULL, NULL, cli_cmd_flag_none, NULL }
+ };
+ 
+--- a/wpa_supplicant/wpa_supplicant.c
++++ b/wpa_supplicant/wpa_supplicant.c
+@@ -1039,8 +1039,6 @@ void wpa_supplicant_set_state(struct wpa
+ 
+ 		sme_sched_obss_scan(wpa_s, 1);
+ 
+-		if (wpa_s->hostapd)
+-			hostapd_reload(wpa_s, wpa_s->current_bss);
+ #if defined(CONFIG_FILS) && defined(IEEE8021X_EAPOL)
+ 		if (!fils_hlp_sent && ssid && ssid->eap.erp)
+ 			update_fils_connect_params = true;
+@@ -1051,8 +1049,6 @@ void wpa_supplicant_set_state(struct wpa
+ #endif /* CONFIG_OWE */
+ 	} else if (state == WPA_DISCONNECTED || state == WPA_ASSOCIATING ||
+ 		   state == WPA_ASSOCIATED) {
+-		if (wpa_s->hostapd)
+-			hostapd_stop(wpa_s);
+ 		wpa_s->new_connection = 1;
+ 		wpa_drv_set_operstate(wpa_s, 0);
+ #ifndef IEEE8021X_EAPOL

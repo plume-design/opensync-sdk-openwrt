@@ -1,0 +1,26 @@
+From 3bc48a0b12478385178cff7dc1c4e92d206a7cc4 Mon Sep 17 00:00:00 2001
+From: Miroslav Rajsek <mrajsek@plume.com>
+Date: Thu, 12 Aug 2021 14:45:23 +0200
+Subject: [PATCH] dnsmasq opensync adaptation
+
+---
+ package/network/services/dnsmasq/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/package/network/services/dnsmasq/Makefile b/package/network/services/dnsmasq/Makefile
+index d31f4c7e63..1784cbd8bd 100644
+--- a/package/network/services/dnsmasq/Makefile
++++ b/package/network/services/dnsmasq/Makefile
+@@ -165,7 +165,9 @@ define Package/dnsmasq/install
+ 	$(INSTALL_CONF) ./files/dhcp.conf $(1)/etc/config/dhcp
+ 	$(INSTALL_CONF) ./files/dnsmasq.conf $(1)/etc/dnsmasq.conf
+ 	$(INSTALL_DIR) $(1)/etc/init.d
++ifndef CONFIG_PACKAGE_opensync
+ 	$(INSTALL_BIN) ./files/dnsmasq.init $(1)/etc/init.d/dnsmasq
++endif
+ 	$(INSTALL_DIR) $(1)/etc/hotplug.d/dhcp
+ 	$(INSTALL_DIR) $(1)/etc/hotplug.d/neigh
+ 	$(INSTALL_DIR) $(1)/etc/hotplug.d/ntp
+-- 
+2.25.1
+

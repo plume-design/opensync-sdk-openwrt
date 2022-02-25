@@ -1,0 +1,5 @@
+/build-*
+/.build-*
+/.cache
+# symlink to the opensync source created from the top level Makefile
+/contrib/files/public-opensync/feeds/opensync_overlay/opensync/opensync_src

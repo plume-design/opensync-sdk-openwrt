@@ -1,0 +1,2 @@
+
+OPENWRT_REFBOARD=undefined

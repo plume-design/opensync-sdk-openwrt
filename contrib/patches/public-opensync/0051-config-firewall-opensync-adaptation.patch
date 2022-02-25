@@ -1,0 +1,26 @@
+From 6b3b2de3a6586a2a218ac4e65deb1eceff8b6a07 Mon Sep 17 00:00:00 2001
+From: Miroslav Rajsek <mrajsek@plume.com>
+Date: Thu, 12 Aug 2021 14:39:41 +0200
+Subject: [PATCH] config-firewall opensync adaptation
+
+---
+ package/network/config/firewall/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/package/network/config/firewall/Makefile b/package/network/config/firewall/Makefile
+index bf2a1060eb..7f112a61bf 100644
+--- a/package/network/config/firewall/Makefile
++++ b/package/network/config/firewall/Makefile
+@@ -48,7 +48,9 @@ define Package/firewall/install
+ 	$(INSTALL_DIR) $(1)/sbin
+ 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/firewall3 $(1)/sbin/fw3
+ 	$(INSTALL_DIR) $(1)/etc/init.d
++ifndef CONFIG_PACKAGE_opensync
+ 	$(INSTALL_BIN) ./files/firewall.init $(1)/etc/init.d/firewall
++endif
+ 	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
+ 	$(INSTALL_CONF) ./files/firewall.hotplug $(1)/etc/hotplug.d/iface/20-firewall
+ 	$(INSTALL_DIR) $(1)/etc/config/
+-- 
+2.25.1
+

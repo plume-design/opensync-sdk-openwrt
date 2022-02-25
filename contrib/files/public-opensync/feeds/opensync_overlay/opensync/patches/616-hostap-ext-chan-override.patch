@@ -1,0 +1,51 @@
+From: aparna.salian <aparna.salian@globaledgesoft.com>
+Subject: [PATCH] lib/hostap:  Override AP VIF's channel with 
+connected bhaul station's channel
+
+--- a/src/lib/hostap/inc/opensync-hapd.h
++++ b/src/lib/hostap/inc/opensync-hapd.h
+@@ -44,6 +44,7 @@ struct hapd {
+     char vhtcaps[512];
+     char country[32];
+     int noscan; /* skip initial obss scan */
++    int ext_chan_override;
+     void (*sta_connected)(struct hapd *hapd, const char *mac, const char *keyid);
+     void (*sta_disconnected)(struct hapd *hapd, const char *mac);
+     void (*ap_enabled)(struct hapd *hapd);
+--- a/src/lib/hostap/src/hapd.c
++++ b/src/lib/hostap/src/hapd.c
+@@ -538,12 +538,13 @@ hapd_vht_oper_chwidth(const struct schem
+ }
+ 
+ static int
+-hapd_vht_oper_centr_freq_idx(const struct schema_Wifi_Radio_Config *rconf)
++hapd_vht_oper_centr_freq_idx(const struct schema_Wifi_Radio_Config *rconf, struct hapd *hapd)
+ {
+     if (!rconf->ht_mode_exists || !rconf->channel_exists)
+         return 0;
+ 
+-    return unii_5g_centerfreq(rconf->ht_mode, rconf->channel);
++    return unii_5g_centerfreq(rconf->ht_mode,
++                hapd->ext_chan_override ? hapd->ext_chan_override : rconf->channel);
+ }
+ 
+ int
+@@ -575,7 +576,8 @@ hapd_conf_gen(struct hapd *hapd,
+     csnprintf(&buf, &len, "logger_syslog_level=3\n");
+     csnprintf(&buf, &len, "ssid=%s\n", vconf->ssid);
+     csnprintf(&buf, &len, "hw_mode=%s\n", rconf->channel > 20 ? "a" : "g");
+-    csnprintf(&buf, &len, "channel=%d\n", rconf->channel);
++    csnprintf(&buf, &len, "channel=%d\n",
++            hapd->ext_chan_override ? hapd->ext_chan_override : rconf->channel);
+     csnprintf(&buf, &len, "ignore_broadcast_ssid=%d\n", closed);
+     csnprintf(&buf, &len, "wmm_enabled=1\n");
+     csnprintf(&buf, &len, "%s", hapd->respect_multi_ap ? "" : "#");
+@@ -597,7 +599,7 @@ hapd_conf_gen(struct hapd *hapd,
+             csnprintf(&buf, &len, "vht_oper_chwidth=%d\n",
+                       hapd_vht_oper_chwidth(rconf));
+             csnprintf(&buf, &len, "vht_oper_centr_freq_seg0_idx=%d\n",
+-                      hapd_vht_oper_centr_freq_idx(rconf));
++                      hapd_vht_oper_centr_freq_idx(rconf, hapd));
+         }
+ 
+     if (hapd->ieee80211n)

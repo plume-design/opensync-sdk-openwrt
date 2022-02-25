@@ -1,0 +1,432 @@
+From: aparna.salian <aparna.salian@globaledgesoft.com>
+Subject: [PATCH] hostapd: Switch to DFS CAC completed channels 
+seamlessly without an AP restart
+
+--- a/hostapd/ctrl_iface.c
++++ b/hostapd/ctrl_iface.c
+@@ -2645,6 +2645,9 @@ static int hostapd_ctrl_iface_chan_switc
+ 	unsigned int i;
+ 	int bandwidth;
+ 	u8 chan;
++	u8 chan_cf1;
++	const char *bcn_int_pos;
++	int bhaul_bcn_int = 0;
+ 
+ 	ret = hostapd_parse_csa_settings(pos, &settings);
+ 	if (ret)
+@@ -2675,6 +2678,24 @@ static int hostapd_ctrl_iface_chan_switc
+ 		break;
+ 	}
+ 
++	if (os_strstr(pos, " auto-ht")) {
++		settings.freq_params.ht_enabled = iface->conf->ieee80211n;
++		settings.freq_params.vht_enabled = iface->conf->ieee80211ac;
++	}
++
++	/* Adjust cs count to account for beacon interval differences */
++	if (bcn_int_pos = os_strstr(pos, "bcn_int=")) {
++		if (bhaul_bcn_int = atoi(bcn_int_pos + 8)) {
++			if (bhaul_bcn_int > iface->conf->beacon_int)
++				settings.cs_count *= (bhaul_bcn_int / iface->conf->beacon_int);
++			else
++				settings.cs_count /= (iface->conf->beacon_int / bhaul_bcn_int);
++		}
++		wpa_printf(MSG_DEBUG, "cs count=%d adjusted for beacon interval "
++			   "differences (bhaul-AP=%d local-AP=%d)",
++			   settings.cs_count, bhaul_bcn_int, iface->conf->beacon_int);
++	}
++
+ 	if (settings.freq_params.center_freq1)
+ 		dfs_range += hostapd_is_dfs_overlap(
+ 			iface, bandwidth, settings.freq_params.center_freq1);
+@@ -2696,25 +2717,33 @@ static int hostapd_ctrl_iface_chan_switc
+ 				   settings.freq_params.bandwidth);
+ 			return -1;
+ 		}
++		if (settings.freq_params.center_freq1) {
++			ret = ieee80211_freq_to_chan(settings.freq_params.center_freq1, &chan_cf1);
++			if (ret == NUM_HOSTAPD_MODES) {
++				wpa_printf(MSG_ERROR, "Failed to get channel for (center_freq1=%d)",
++					   settings.freq_params.center_freq1);
++				return -1;
++			}
++		}
+ 
+ 		settings.freq_params.channel = chan;
+ 
+-		wpa_printf(MSG_DEBUG,
+-			   "DFS/CAC to (channel=%u, freq=%d, sec_channel_offset=%d, bw=%d, center_freq1=%d)",
+-			   settings.freq_params.channel,
+-			   settings.freq_params.freq,
+-			   settings.freq_params.sec_channel_offset,
+-			   settings.freq_params.bandwidth,
+-			   settings.freq_params.center_freq1);
+-
+-		/* Perform CAC and switch channel */
+-		hostapd_switch_channel_fallback(iface, &settings.freq_params);
+-		return 0;
+-	}
++		if (!ch_switch_hapd_is_dfs_chan_available(
++				iface, chan, chan_cf1, bw_to_vht_oper_chwidth(bandwidth),
++				settings.freq_params.sec_channel_offset)) {
++			wpa_printf(MSG_DEBUG,
++				   "DFS/CAC to (channel=%u, freq=%d, sec_channel_offset=%d, "
++				   "bw=%d, center_freq1=%d)",
++				   settings.freq_params.channel,
++				   settings.freq_params.freq,
++				   settings.freq_params.sec_channel_offset,
++				   settings.freq_params.bandwidth,
++				   settings.freq_params.center_freq1);
+ 
+-	if (os_strstr(pos, " auto-ht")) {
+-		settings.freq_params.ht_enabled = iface->conf->ieee80211n;
+-		settings.freq_params.vht_enabled = iface->conf->ieee80211ac;
++			/* Perform CAC and switch channel */
++			hostapd_switch_channel_fallback(iface, &settings.freq_params);
++			return 0;
++		}
+ 	}
+ 
+ 	for (i = 0; i < iface->num_bss; i++) {
+--- a/src/ap/dfs.c
++++ b/src/ap/dfs.c
+@@ -1375,3 +1375,198 @@ int hostapd_is_dfs_overlap(struct hostap
+ 
+ 	return res;
+ }
++
++
++int ch_switch_hapd_is_dfs_chan_available(struct hostapd_iface *iface, int channel,
++					 int cf1_chan, int chwidth,
++					 int sec_chan_offset)
++{
++	int cac_completed = 0;
++	int restore_channel = iface->conf->channel;
++	int restore_cf1_chan = iface->conf->vht_oper_centr_freq_seg0_idx;
++	int restore_chwidth = iface->conf->vht_oper_chwidth;
++	int restore_sec_chan_offset = iface->conf->secondary_channel;
++
++	/* Todo: Add support for 11ax and 160 bandwidth */
++	iface->conf->channel = channel;
++	iface->conf->vht_oper_centr_freq_seg0_idx = cf1_chan;
++	iface->conf->vht_oper_chwidth = chwidth;
++	iface->conf->secondary_channel = sec_chan_offset;
++
++	cac_completed = hostapd_is_dfs_chan_available(iface);
++
++	wpa_printf(MSG_DEBUG, "%s: DFS channel (channel=%d"
++		   " vht_oper_centr_freq_seg0_idx=%d vht_oper_chwidth=%d)"
++		   " CAC completed: %s",
++		   __func__, iface->conf->channel,
++		   iface->conf->vht_oper_centr_freq_seg0_idx,
++		   iface->conf->vht_oper_chwidth, cac_completed ? "Yes" : "No");
++
++	iface->conf->channel = restore_channel;
++	iface->conf->vht_oper_centr_freq_seg0_idx = restore_cf1_chan;
++	iface->conf->vht_oper_chwidth = restore_chwidth;
++	iface->conf->secondary_channel = restore_sec_chan_offset;
++
++	return cac_completed;
++}
++
++static int get_start_chan_idx(
++			const struct hostapd_hw_modes *mode,
++			enum chan_width chan_width, int freq,
++			int cf1, int cf2, int *seg1_start)
++{
++	struct hostapd_channel_data *chan;
++	u8 channel = 0;
++	int channel_no = -1;
++	int res = -1, i;
++	int chan_seg1 = -1;
++
++	*seg1_start = -1;
++
++	switch (chan_width) {
++	case CHAN_WIDTH_20_NOHT:
++	case CHAN_WIDTH_20:
++		if (ieee80211_freq_to_chan(freq, &channel)
++					   != NUM_HOSTAPD_MODES)
++			channel_no = channel;
++		break;
++	case CHAN_WIDTH_40:
++		if (ieee80211_freq_to_chan(cf1, &channel)
++					   != NUM_HOSTAPD_MODES)
++			channel_no = channel - 2;
++		break;
++	case CHAN_WIDTH_80:
++		if (ieee80211_freq_to_chan(cf1, &channel)
++					   != NUM_HOSTAPD_MODES)
++			channel_no = channel - 6;
++		break;
++	case CHAN_WIDTH_160:
++		if (ieee80211_freq_to_chan(cf1, &channel)
++					   != NUM_HOSTAPD_MODES)
++			channel_no = channel - 14;
++	case CHAN_WIDTH_80P80:
++		if (ieee80211_freq_to_chan(cf1, &channel)
++					   != NUM_HOSTAPD_MODES)
++			channel_no = channel - 6;
++		if (ieee80211_freq_to_chan(cf2,	&channel)
++					   != NUM_HOSTAPD_MODES)
++			chan_seg1 = channel - 6;
++		break;
++	default:
++		wpa_printf(MSG_INFO, "DFS only VHT20/40/80/160/80+80 is supported now");
++		channel_no = -1;
++		break;
++	}
++
++	/* Get idx */
++	for (i = 0; i < mode->num_channels; i++) {
++		chan = &mode->channels[i];
++		if (chan->chan == channel_no) {
++			res = i;
++			break;
++		}
++	}
++
++	if (res != -1 && chan_seg1 > -1) {
++		int found = 0;
++
++		/* Get idx for seg1 */
++		for (i = 0; i < mode->num_channels; i++) {
++			chan = &mode->channels[i];
++			if (chan->chan == chan_seg1) {
++				*seg1_start = i;
++				found = 1;
++				break;
++			}
++		}
++		if (!found)
++			res = -1;
++	}
++
++	if (res == -1) {
++		wpa_printf(MSG_DEBUG,
++			  "DFS chan_idx seems wrong; num-ch: %d ch-no: %d"
++			  " ch_switch-freq: %d ch_width=%s cf1=%d cf2=%d",
++			  mode->num_channels, channel_no, freq,
++			  channel_width_to_string(chan_width), cf1, cf2);
++	}
++
++	return res;
++}
++
++
++static int get_used_n_chans(enum chan_width chan_width, int *seg1)
++{
++	int n_chans = 1;
++
++	*seg1 = 0;
++
++	switch (chan_width) {
++	case CHAN_WIDTH_160:
++		n_chans = 8;
++		break;
++	case CHAN_WIDTH_80P80:
++		n_chans = 4;
++		*seg1 = 4;
++		break;
++	case CHAN_WIDTH_80:
++		n_chans = 4;
++		break;
++	case CHAN_WIDTH_40:
++		n_chans = 2;
++		break;
++	case CHAN_WIDTH_20_NOHT:
++	case CHAN_WIDTH_20:
++	default:
++		break;
++	}
++
++	return n_chans;
++}
++
++
++static int ch_switch_dfs_check_chans_available(
++			const struct hostapd_hw_modes *mode,
++			int start_chan_idx, int n_chans)
++{
++	struct hostapd_channel_data *channel;
++	int i;
++
++	for (i = 0; i < n_chans; i++) {
++		channel = &mode->channels[start_chan_idx + i];
++
++		if (channel->flag & HOSTAPD_CHAN_DISABLED)
++			break;
++
++		if (!(channel->flag & HOSTAPD_CHAN_RADAR))
++			continue;
++
++		if ((channel->flag & HOSTAPD_CHAN_DFS_MASK) !=
++		     HOSTAPD_CHAN_DFS_AVAILABLE)
++			break;
++	}
++
++	return i == n_chans;
++}
++
++
++int ch_switch_is_dfs_chan_available(const struct hostapd_hw_modes *modes,
++				    union wpa_event_data *data)
++{
++	int n_chans, n_chans1, start_chan_idx, start_chan_idx1;
++
++	/* Get the start (first) channel for current configuration */
++	start_chan_idx = get_start_chan_idx(modes,
++				data->ch_switch.ch_width, data->ch_switch.freq,
++				data->ch_switch.cf1, data->ch_switch.cf2,
++				&start_chan_idx1);
++	if (start_chan_idx < 0)
++		return 0;
++
++	/* Get the number of used channels, depending on width */
++	n_chans = get_used_n_chans(data->ch_switch.ch_width, &n_chans1);
++
++	/* Check if all channels are DFS available */
++	return ch_switch_dfs_check_chans_available(modes, start_chan_idx,
++						   n_chans);
++}
+--- a/wpa_supplicant/events.c
++++ b/wpa_supplicant/events.c
+@@ -49,6 +49,7 @@
+ #include "mesh_mpm.h"
+ #include "wmm_ac.h"
+ #include "dpp_supplicant.h"
++#include "ap/dfs.h"
+ 
+ 
+ #define MAX_OWE_TRANSITION_BSS_SELECT_COUNT 5
+@@ -4619,13 +4620,15 @@ supplicant_ch_switch_started(struct wpa_
+ 		break;
+ 	}
+ 
+-	asprintf(&cmd, "CHAN_SWITCH %d %d sec_channel_offset=%d center_freq1=%d center_freq2=%d, bandwidth=%d auto-ht\n",
+-		data->ch_switch.count - 1,
++	asprintf(&cmd, "CHAN_SWITCH %d %d sec_channel_offset=%d center_freq1=%d "
++		"center_freq2=%d, bandwidth=%d bcn_int=%d auto-ht\n",
++		data->ch_switch.count ? data->ch_switch.count : 1,
+ 		data->ch_switch.freq,
+ 		data->ch_switch.ch_offset,
+ 		data->ch_switch.cf1,
+ 		data->ch_switch.cf2,
+-		width);
++		width,
++		wpa_s->current_bss->beacon_int);
+ 	ret = wpa_ctrl_request(wpa_s->hostapd, cmd, os_strlen(cmd), buf, &len, NULL);
+ 	free(cmd);
+ 
+@@ -4633,6 +4636,55 @@ supplicant_ch_switch_started(struct wpa_
+ 		wpa_printf(MSG_ERROR, "\nFailed to reload hostapd AP interfaces\n");
+ }
+ 
++
++/*
++ * Support CSA event for mac80211 based devices with active AP and STA VIFs
++ * on the same radio: For channel switch to DFS CAC pending channels, stop
++ * AP VIFs to allow channel switch on the STA VIF. To re-enable AP VIFs
++ * successfully, send the chan_switch event to AP VIFs after csa is
++ * completed on the STA.
++ */
++static void supplicant_ch_switch_concurrent(struct wpa_supplicant *wpa_s,
++			    union wpa_event_data *data, int event)
++{
++	wpa_supplicant_update_channel_list(wpa_s, NULL);
++
++	if (event == EVENT_CH_SWITCH) {
++		if (!ch_switch_is_dfs_chan_available(wpa_s->hw.modes, data)) {
++			wpa_printf(MSG_DEBUG, "%s: Restart hostapd AP interfaces on"
++				   " (ch_freq=%d ch_width=%s cf1=%d) ",
++				   __func__, data->ch_switch.freq,
++				   channel_width_to_string(data->ch_switch.ch_width),
++				   data->ch_switch.cf1);
++			supplicant_ch_switch_started(wpa_s, data);
++		}
++		return;
++	}
++
++	/* EVENT_CH_SWITCH_STARTED */
++	if (!ch_switch_is_dfs_chan_available(wpa_s->hw.modes, data)) {
++		const char *cmd = "STOP_AP";
++		char reply[256];
++		size_t reply_len = sizeof(reply);
++
++		wpa_printf(MSG_DEBUG, "%s: Stop hostapd AP interfaces "
++			   "as DFS CAC is pending on (ch_freq=%d "
++			   "ch_width=%s cf1=%d)",
++			   __func__, data->ch_switch.freq,
++			   channel_width_to_string(data->ch_switch.ch_width),
++			   data->ch_switch.cf1);
++
++		if (wpa_ctrl_request(wpa_s->hostapd, cmd, os_strlen(cmd), reply,
++				     &reply_len, NULL) < 0)
++			wpa_printf(MSG_ERROR, "Failed to stop hostapd AP "
++				   "interfaces");
++
++		return;
++	}
++	supplicant_ch_switch_started(wpa_s, data);
++}
++
++
+ void supplicant_event(void *ctx, enum wpa_event_type event,
+ 		      union wpa_event_data *data)
+ {
+@@ -4935,10 +4987,10 @@ void supplicant_event(void *ctx, enum wp
+ 			channel_width_to_string(data->ch_switch.ch_width),
+ 			data->ch_switch.cf1,
+ 			data->ch_switch.cf2);
+-		if (event == EVENT_CH_SWITCH_STARTED) {
+-			supplicant_ch_switch_started(wpa_s, data);
++
++		supplicant_ch_switch_concurrent(wpa_s, data, event);
++		if (event == EVENT_CH_SWITCH_STARTED)
+ 			break;
+-		}
+ 
+ 		wpa_s->assoc_freq = data->ch_switch.freq;
+ 		wpa_s->current_ssid->frequency = data->ch_switch.freq;
+--- a/src/ap/dfs.h
++++ b/src/ap/dfs.h
+@@ -32,5 +32,9 @@ int hostapd_dfs_start_cac(struct hostapd
+ int hostapd_handle_dfs_offload(struct hostapd_iface *iface);
+ int hostapd_is_dfs_overlap(struct hostapd_iface *iface, enum chan_width width,
+ 			   int center_freq);
++int ch_switch_hapd_is_dfs_chan_available(struct hostapd_iface *iface, int channel,
++					 int cf1_chan, int chwidth, int sec_chan_offset);
++int ch_switch_is_dfs_chan_available(const struct hostapd_hw_modes *modes,
++				    union wpa_event_data *data);
+ 
+ #endif /* DFS_H */
+--- a/src/common/ieee802_11_common.c
++++ b/src/common/ieee802_11_common.c
+@@ -2520,3 +2520,18 @@ struct wpabuf * ieee802_11_defrag(struct
+ 
+ 	return ieee802_11_defrag_data(elems, eid, eid_ext, data, len);
+ }
++
++
++int bw_to_vht_oper_chwidth(int bw)
++{
++	switch (bw) {
++	case CHAN_WIDTH_80P80:
++		return 3;
++	case CHAN_WIDTH_160:
++		return 2;
++	case CHAN_WIDTH_80:
++		return 1;
++	default:
++		return 0;
++	}
++}
+--- a/src/common/ieee802_11_common.h
++++ b/src/common/ieee802_11_common.h
+@@ -316,5 +316,6 @@ struct wpabuf * ieee802_11_defrag_data(s
+ 				       const u8 *data, u8 len);
+ struct wpabuf * ieee802_11_defrag(struct ieee802_11_elems *elems,
+ 				  u8 eid, u8 eid_ext);
++int bw_to_vht_oper_chwidth(int bw);
+ 
+ #endif /* IEEE802_11_COMMON_H */

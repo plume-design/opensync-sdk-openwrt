@@ -1,0 +1,30 @@
+EXTTIP-120: set -vfile:off
+
+vfile:info fills up /tmp with logs occasionally, as reported 
+in EXTADT-9. With this the EXTADT-9 workaround solution is no 
+longer needed.
+
+Signed-off-by: Miroslav Rajsek <mrajsek@plume.com>
+---
+diff --git a/utilities/ovs-ctl.in b/utilities/ovs-ctl.in
+index 9c2a092ea7..1e1efba270 100644
+--- a/utilities/ovs-ctl.in
++++ b/utilities/ovs-ctl.in
+@@ -138,7 +138,7 @@ do_start_ovsdb () {
+         if test X"$SELF_CONFINEMENT" = Xno; then
+             set "$@" --no-self-confinement
+         fi
+-        set "$@" -vconsole:emer -vsyslog:err -vfile:info
++        set "$@" -vconsole:emer -vsyslog:err -vfile:off
+         set "$@" --remote=punix:"$DB_SOCK"
+         set "$@" --private-key=db:Open_vSwitch,SSL,private_key
+         set "$@" --certificate=db:Open_vSwitch,SSL,certificate
+@@ -205,7 +205,7 @@ do_start_forwarding () {
+ 
+         # Start ovs-vswitchd.
+         set ovs-vswitchd unix:"$DB_SOCK"
+-        set "$@" -vconsole:emer -vsyslog:err -vfile:info
++        set "$@" -vconsole:emer -vsyslog:err -vfile:off
+         if test X"$MLOCKALL" != Xno; then
+             set "$@" --mlockall
+         fi

@@ -1,0 +1,64 @@
+From: aparna.salian <aparna.salian@globaledgesoft.com>
+Subject: [PATCH] hostapd: Radar event support in extender mode
+
+Trigger disconnection on STA interface if radar is detected on the 
+operating channel. Required to successfully handle channel switch on 
+local AP VIFs when radar is detected.
+
+--- a/src/ap/dfs.c
++++ b/src/ap/dfs.c
+@@ -1570,3 +1570,25 @@ int ch_switch_is_dfs_chan_available(cons
+ 	return ch_switch_dfs_check_chans_available(modes, start_chan_idx,
+ 						   n_chans);
+ }
++
++bool is_curr_freq_bw_matching(const struct hostapd_hw_modes *modes,
++			     int curr_freq, int freq,
++			     enum chan_width chan_width,
++			     int cf1, int cf2)
++{
++	int i, n_chans, n_chans1, start_chan_idx, start_chan_idx1;
++
++	start_chan_idx = get_start_chan_idx(modes, chan_width, freq, cf1, cf2,
++					    &start_chan_idx1);
++	if (start_chan_idx < 0)
++		return 0;
++
++	n_chans = get_used_n_chans(chan_width, &n_chans1);
++
++	for (i = 0; i < n_chans; i++) {
++		if (curr_freq == modes->channels[start_chan_idx + i].freq)
++			return true;
++	}
++
++	return false;
++}
+--- a/wpa_supplicant/ap.c
++++ b/wpa_supplicant/ap.c
+@@ -1710,6 +1710,14 @@ void wpas_ap_event_dfs_radar_detected(st
+ {
+ 	struct hostapd_iface *iface = wpa_s->ap_iface;
+ 
++	if (is_curr_freq_bw_matching(wpa_s->hw.modes, wpa_s->assoc_freq,
++				     radar->freq, radar->chan_width,
++				     radar->cf1, radar->cf2)) {
++		wpa_printf(MSG_DEBUG, "Disconnect from AP as DFS radar"
++			   " detected on %d MHz", radar->freq);
++		wpas_request_disconnection(wpa_s);
++	}
++
+ 	if (!iface)
+ 		iface = wpa_s->ifmsh;
+ 	if (!iface || !iface->bss[0])
+--- a/src/ap/dfs.h
++++ b/src/ap/dfs.h
+@@ -36,5 +36,9 @@ int ch_switch_hapd_is_dfs_chan_available
+ 					 int cf1_chan, int chwidth, int sec_chan_offset);
+ int ch_switch_is_dfs_chan_available(const struct hostapd_hw_modes *modes,
+ 				    union wpa_event_data *data);
++bool is_curr_freq_bw_matching(const struct hostapd_hw_modes *modes,
++			      int curr_freq, int freq,
++			      enum chan_width chan_width,
++			      int cf1, int cf2);
+ 
+ #endif /* DFS_H */
