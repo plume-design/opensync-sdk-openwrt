@@ -8,7 +8,7 @@ for band and client steering functionality.
 
 --- a/src/ap/ieee802_11.c
 +++ b/src/ap/ieee802_11.c
-@@ -4597,6 +4597,11 @@
+@@ -4597,6 +4597,11 @@ static void handle_disassoc(struct hosta
  		   le_to_host16(mgmt->u.disassoc.reason_code));
  	hostapd_ubus_notify(hapd, "disassoc", mgmt->sa);
  
@@ -20,7 +20,7 @@ for band and client steering functionality.
  	sta = ap_get_sta(hapd, mgmt->sa);
  	if (sta == NULL) {
  		wpa_printf(MSG_INFO, "Station " MACSTR " trying to disassociate, but it is not associated",
-@@ -4664,6 +4669,11 @@
+@@ -4664,6 +4669,11 @@ static void handle_deauth(struct hostapd
  
  	hostapd_ubus_notify(hapd, "deauth", mgmt->sa);
  
@@ -32,7 +32,7 @@ for band and client steering functionality.
  	sta = ap_get_sta(hapd, mgmt->sa);
  	if (sta == NULL) {
  		wpa_msg(hapd->msg_ctx, MSG_DEBUG, "Station " MACSTR " trying "
-@@ -4906,6 +4916,29 @@
+@@ -4906,6 +4916,29 @@ static int handle_action(struct hostapd_
  	return 1;
  }
  
@@ -42,7 +42,7 @@ for band and client steering functionality.
 +
 +	switch (stype) {
 +	case WLAN_FC_STYPE_PROBE_REQ:
-+		stype_str = EVT_FRAME_PROBE_REQ; 
++		stype_str = EVT_FRAME_PROBE_REQ;
 +		break;
 +	case WLAN_FC_STYPE_ASSOC_REQ:
 +		stype_str = EVT_FRAME_ASSOC_REQ;
@@ -62,7 +62,7 @@ for band and client steering functionality.
  
  /**
   * ieee802_11_mgmt - process incoming IEEE 802.11 management frames
-@@ -4929,6 +4962,7 @@
+@@ -4929,6 +4962,7 @@ int ieee802_11_mgmt(struct hostapd_data
  	unsigned int freq;
  	int ssi_signal = fi ? fi->ssi_signal : 0;
  	int ubus_resp;
@@ -70,7 +70,7 @@ for band and client steering functionality.
  
  	if (len < 24)
  		return 0;
-@@ -4980,6 +5014,34 @@
+@@ -4980,6 +5014,34 @@ int ieee802_11_mgmt(struct hostapd_data
  		return 1;
  	}
  
@@ -83,7 +83,7 @@ for band and client steering functionality.
 +			if (len > IEEE80211_HDRLEN) {
 +				ie = ((const u8 *) mgmt) + IEEE80211_HDRLEN;
 +				ie_len = len - IEEE80211_HDRLEN;
-+				if (ieee802_11_parse_elems(ie, ie_len, &elems, 0) == ParseOK) {
++				if (ieee802_11_parse_elems(ie, ie_len, &elems, 0) != ParseFailed) {
 +					wpa_msg(hapd->msg_ctx, MSG_INFO, NL_CMD_FRAME
 +							"type=%s sa=" MACSTR " ssi_signal=%d ssid_null=%d",
 +							stype_str, MAC2STR(mgmt->sa), ssi_signal,
@@ -107,7 +107,7 @@ for band and client steering functionality.
  		return 1;
 --- a/src/common/wpa_ctrl.h
 +++ b/src/common/wpa_ctrl.h
-@@ -392,6 +392,16 @@
+@@ -392,6 +392,16 @@ extern "C" {
   * frame=<saqueryreq/saqueryresp> error=<error string> */
  #define OCV_FAILURE "OCV-FAILURE "
  

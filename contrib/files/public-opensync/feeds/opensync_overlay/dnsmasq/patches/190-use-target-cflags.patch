@@ -1,0 +1,13 @@
+Index: dnsmasq-2.83/Makefile
+===================================================================
+--- dnsmasq-2.83.orig/Makefile
++++ dnsmasq-2.83/Makefile
+@@ -161,7 +161,7 @@ $(objs): $(copts_conf) $(hdrs)
+ 	$(CC) $(CFLAGS) $(COPTS) $(i18n) $(build_cflags) $(RPM_OPT_FLAGS) -c $<	
+ 
+ dnsmasq : $(objs)
+-	$(CC) $(LDFLAGS) -o $@ $(objs) $(build_libs) $(LIBS) 
++	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(objs) $(build_libs) $(LIBS) 
+ 
+ dnsmasq.pot : $(objs:.o=.c) $(hdrs)
+ 	$(XGETTEXT) -d dnsmasq --foreign-user --omit-header --keyword=_ -o $@ -i $(objs:.o=.c)

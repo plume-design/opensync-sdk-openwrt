@@ -95,7 +95,7 @@ rebuild_docker()
             docker_quiet_opt="--quiet"
         fi
 
-        if [ "$OPT_NO_CACHE_BUILD" -eq "1" ]; then
+        if [ $OPT_NO_CACHE_BUILD -eq 1 ]; then
             docker_no_cache_opt="--no-cache"
         fi
 
@@ -109,12 +109,12 @@ rebuild_docker()
 
         # quasi 'set -x' ...
         echo_debug  "+" \
-        docker build ${docker_no_cache_opt} ${docker_quiet_opt} --tag "$TAG" .
+        docker build ${docker_quiet_opt} ${docker_no_cache_opt} --tag "$TAG" .
 
         # ... and then the real thing:
         echo "${ColorDim}" >&2
 
-        docker build ${docker_no_cache_opt} ${docker_quiet_opt} --tag "$TAG" . >&2  # to stderr
+        docker build ${docker_quiet_opt} ${docker_no_cache_opt} --tag "$TAG" . >&2  # to stderr
 
         echo "${ColorOff}" >&2
 
@@ -207,6 +207,7 @@ run_docker()
 #=============================================================================
 
 OPT_BUILD_DOCKER_IMAGE=0
+OPT_NO_CACHE_BUILD=0
 OPT_QUIET_DOCKER_BUILD=${DOCK_RUN_OPT_QUIET_DOCKER_BUILD:-0}
 OPT_SKIP_DOCKER_REBUILD=0
 OPT_QUIET=0

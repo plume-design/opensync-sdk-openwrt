@@ -1,0 +1,57 @@
+Index: dnsmasq-2.83/src/lease.c
+===================================================================
+--- dnsmasq-2.83.orig/src/lease.c
++++ dnsmasq-2.83/src/lease.c
+@@ -16,6 +16,9 @@
+ 
+ #include "dnsmasq.h"
+ 
++#define DHCP_HOSTNAME_PREFIX_FMT        "-%d"
++#define DHCP_HOSTNAME_PREFIX_LEN        7
++
+ #ifdef HAVE_DHCP
+ 
+ static struct dhcp_lease *leases = NULL, *old_leases = NULL;
+@@ -1007,10 +1010,10 @@ void lease_set_hostname(struct dhcp_leas
+   
+   if (name)
+     {
+-      if ((new_name = whine_malloc(strlen(name) + 1)))
++      if ((new_name = whine_malloc(strlen(name) + 1 + DHCP_HOSTNAME_PREFIX_LEN)))
+ 	{
+ 	  strcpy(new_name, name);
+-	  if (domain && (new_fqdn = whine_malloc(strlen(new_name) + strlen(domain) + 2)))
++	  if (domain && (new_fqdn = whine_malloc(strlen(new_name) + strlen(domain) + 2 + DHCP_HOSTNAME_PREFIX_LEN)))
+ 	    {
+ 	      strcpy(new_fqdn, name);
+ 	      strcat(new_fqdn, ".");
+@@ -1053,7 +1056,29 @@ void lease_set_hostname(struct dhcp_leas
+ 	      return;
+ 	    }
+ 	
++
++	  /*
++	   * Do not kill the old name, but generate a new one for the new one
++	   */
++#if 0
+ 	  kill_name(lease_tmp);
++#else
++	  static uint32_t hprefix_count = 1;
++	  char hprefix[DHCP_HOSTNAME_PREFIX_LEN];
++
++	  snprintf(hprefix, sizeof(hprefix), "-%d", (hprefix_count++) % 65536);
++	  if (new_name != NULL) strcat(new_name, hprefix);
++
++	  /* Regenerate the FQDN -- this time, include the prefix */
++	  if (new_fqdn != NULL)
++	    {
++	      strcpy(new_fqdn, name);
++	      strcat(new_fqdn, hprefix);
++	      strcat(new_fqdn, ".");
++	      strcat(new_fqdn, domain);
++	    }
++#endif
++
+ 	  break;
+ 	}
+     }

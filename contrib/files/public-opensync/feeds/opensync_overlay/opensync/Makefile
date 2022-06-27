@@ -1,25 +1,11 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=opensync
-PKG_VERSION:=2.0.5.0
+PKG_VERSION:=3.2.7.0
 
-PKG_BUILD_DEPENDS:=python3-kconfiglib/host python3-jinja2/host python3-markupsafe/host
-HOST_BUILD_DEPENDS:=protobuf-c/host
+PKG_BUILD_DEPENDS:=python3-kconfiglib/host python3-jinja2/host python3-markupsafe/host python3-pydot/host python3-pyparsing/host
 
 include $(INCLUDE_DIR)/package.mk
-include $(INCLUDE_DIR)/host-build.mk
-
-define Host/Configure
-endef
-
-define Host/Compile
-endef
-
-define Host/Install
-endef
-
-define Host/Clean
-endef
 
 define Package/opensync
 	CATEGORY := Network
@@ -35,12 +21,10 @@ define Package/opensync/description
 endef
 
 define Build/Prepare
-	cp $(BUILD_DIR)/hostapd-wpad-full-openssl/hostapd-2020-06-08-5a8b3662/src/utils/os_unix.o $(STAGING_DIR)/usr/lib/
-	cp $(BUILD_DIR)/hostapd-wpad-full-openssl/hostapd-2020-06-08-5a8b3662/src/common/wpa_ctrl.o $(STAGING_DIR)/usr/lib/
-	cp $(BUILD_DIR)/hostapd-wpad-full-openssl/hostapd-2020-06-08-5a8b3662/src/common/wpa_ctrl.h $(STAGING_DIR)/usr/include/
 endef
 
-OPENSYNC_ROOTFS:=work/$(OPENSYNC_TARGET)/rootfs/
+export OVS_INTERNAL_PATH=$(wildcard $(BUILD_DIR)/linux-$(BOARD)_$(SUBTARGET)/openvswitch*)
+OPENSYNC_ROOTFS:=core/work/$(OPENSYNC_TARGET)/rootfs/
 
 TARGET_CFLAGS += \
 	-ffunction-sections \
@@ -50,10 +34,10 @@ TARGET_LDFLAGS += -Wl,--gc-sections
 
 MAKE_FLAGS := \
 	LDFLAGS="$(TARGET_LDFLAGS)" \
-	TARGET="$(OPENSYNC_TARGET)" \
-	IMAGE_DEPLOYMENT_PROFILE="$(IMAGE_DEPLOYMENT_PROFILE)" \
-	TOOLCHAIN_DIR="$(TOOLCHAIN_DIR)" \
-	TOOLCHAIN_PREFIX="$(TARGET_CROSS)" \
+	TARGET=$(OPENSYNC_TARGET) \
+	IMAGE_DEPLOYMENT_PROFILE=$(IMAGE_DEPLOYMENT_PROFILE) \
+	TOOLCHAIN_DIR=$(TOOLCHAIN_DIR) \
+	TOOLCHAIN_PREFIX=$(TARGET_CROSS) \
 	NO_RDYNAMIC=1
 
 define Build/Compile
@@ -61,24 +45,10 @@ define Build/Compile
 		echo Error: Invalid opensync soruces path OPENSYNC_SRC_ABS=$(OPENSYNC_SRC_ABS); \
 		exit 1; \
 	fi
-	cp -r $(OPENSYNC_SRC_ABS)/core/* $(PKG_BUILD_DIR)/
-	rm $(PKG_BUILD_DIR)/{vendor,platform,service-provider}
-	cp -r $(OPENSYNC_SRC_ABS)/platform $(PKG_BUILD_DIR)/
-	cp -r $(OPENSYNC_SRC_ABS)/vendor $(PKG_BUILD_DIR)/
-	cp -r $(OPENSYNC_SRC_ABS)/service-provider $(PKG_BUILD_DIR)/
+	$(CP) $(OPENSYNC_SRC_ABS)/* $(PKG_BUILD_DIR)/
 	$(Build/Patch)
-	$(STAGING_DIR_HOSTPKG)/bin/protoc-c \
-			--c_out=$(PKG_BUILD_DIR)/src/lib/datapipeline/inc \
-			--proto_path=$(PKG_BUILD_DIR)/interfaces \
-			$(PKG_BUILD_DIR)/interfaces/opensync_stats.proto
-	$(CP) $(PKG_BUILD_DIR)/src/lib/datapipeline/inc/opensync_stats.pb-c.c $(PKG_BUILD_DIR)/src/lib/datapipeline/src
-	$(RM) $(PKG_BUILD_DIR)/src/lib/datapipeline/inc/opensync_stats.pb-c.c
-
-	$(MAKE) -C $(PKG_BUILD_DIR) V=1 \
-		OWRT_CFLAGS="$(TARGET_CFLAGS)" \
-		$(MAKE_FLAGS)
-	$(MAKE) -C $(PKG_BUILD_DIR) rootfs \
-		$(MAKE_FLAGS)
+	$(MAKE) -C $(PKG_BUILD_DIR)/core OWRT_CFLAGS="$(TARGET_CFLAGS)" $(MAKE_FLAGS)
+	$(MAKE) -C $(PKG_BUILD_DIR)/core rootfs $(MAKE_FLAGS)
 endef
 
 define Package/opensync/install
@@ -91,7 +61,7 @@ define Package/opensync/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/$(OPENSYNC_ROOTFS)/usr/opensync/etc/* $(1)/usr/opensync/etc
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/$(OPENSYNC_ROOTFS)/usr/opensync/tools/ovsh $(1)/sbin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/$(OPENSYNC_ROOTFS)/usr/opensync/lib/* $(1)/usr/lib
-	$(MAKE) -C $(PKG_BUILD_DIR) TARGET=$(OPENSYNC_TARGET) rootfs-copy-only INSTALL_ROOTFS_DIR=$(1)
+	$(MAKE) -C $(PKG_BUILD_DIR)/core TARGET=$(OPENSYNC_TARGET) rootfs-copy-only INSTALL_ROOTFS_DIR=$(1)
 endef
 
 $(eval $(call HostBuild))

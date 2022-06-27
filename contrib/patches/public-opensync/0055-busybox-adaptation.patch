@@ -1,0 +1,12 @@
+--- a/package/utils/busybox/Makefile
++++ b/package/utils/busybox/Makefile
+@@ -107,6 +107,9 @@ define Package/busybox/install
+ 	$(INSTALL_DIR) $(1)/etc/init.d
+ 	$(INSTALL_DIR) $(1)/usr/sbin
+ 	$(CP) $(PKG_INSTALL_DIR)/* $(1)/
++ifdef CONFIG_PACKAGE_opensync
++	$(RM) $(1)/sbin/reboot
++endif
+ ifneq ($(CONFIG_BUSYBOX_$(BUSYBOX_SYM)_CROND),)
+ 	$(INSTALL_BIN) ./files/cron $(1)/etc/init.d/cron
+ endif

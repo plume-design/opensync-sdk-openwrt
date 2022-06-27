@@ -2,9 +2,9 @@ From: aparna.salian <aparna.salian@globaledgesoft.com>
 Subject: [PATCH] lib/hostap: Pass phy name to hostapd while adding
 a new interface
 
---- a/src/lib/hostap/src/hapd.c
-+++ b/src/lib/hostap/src/hapd.c
-@@ -843,7 +843,7 @@ hapd_sta_iter(struct hapd *hapd,
+--- a/core/src/lib/hostap/src/hapd.c
++++ b/core/src/lib/hostap/src/hapd.c
+@@ -1415,7 +1415,7 @@ hapd_sta_iter(struct hapd *hapd,
  static int
  hapd_ctrl_add(struct hapd *hapd)
  {

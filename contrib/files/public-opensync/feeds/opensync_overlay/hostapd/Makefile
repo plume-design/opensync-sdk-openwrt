@@ -453,7 +453,6 @@ define Package/eapol-test-wolfssl
   PROVIDES:=eapol-test
 endef
 
-
 ifneq ($(wildcard $(PKG_BUILD_DIR)/.config_*),$(subst .configured_,.config_,$(STAMP_CONFIGURED)))
   define Build/Configure/rebuild
 	$(FIND) $(PKG_BUILD_DIR) -name \*.o -or -name \*.a | $(XARGS) rm -f
@@ -565,6 +564,14 @@ define Build/Compile
 	$(Build/Compile/$(BUILD_VARIANT))
 endef
 
+define Build/InstallDev
+	$(INSTALL_DIR) $(1)/usr/include
+	$(INSTALL_DIR) $(1)/usr/lib
+	$(CP) $(PKG_BUILD_DIR)/src/common/wpa_ctrl.h $(1)/usr/include/
+	$(CP) $(PKG_BUILD_DIR)/src/common/wpa_ctrl.o $(1)/usr/lib/
+	$(CP) $(PKG_BUILD_DIR)/src/utils/os_unix.o $(1)/usr/lib/
+endef
+
 define Install/hostapd
 	$(INSTALL_DIR) $(1)/usr/sbin
 endef
@@ -584,6 +591,7 @@ define Package/hostapd/install
 	$(call Install/hostapd,$(1))
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/hostapd/hostapd $(1)/usr/sbin/
 endef
+
 Package/hostapd-basic/install = $(Package/hostapd/install)
 Package/hostapd-hs20/install = $(Package/hostapd/install)
 Package/hostapd-mini/install = $(Package/hostapd/install)

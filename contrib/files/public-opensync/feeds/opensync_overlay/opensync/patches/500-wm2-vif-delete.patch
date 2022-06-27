@@ -1,28 +1,28 @@
 From: aparna.salian <aparna.salian@globaledgesoft.com>
 Subject: [PATCH] wm2: Remove vif state entry for deleted interface
 
---- a/src/wm2/src/wm2_radio.c
-+++ b/src/wm2/src/wm2_radio.c
-@@ -780,6 +780,7 @@ wm2_vconf_recalc(const char *ifname, bool force)
-     int num_cconfs;
+--- a/core/src/wm2/src/wm2_radio.c
++++ b/core/src/wm2/src/wm2_radio.c
+@@ -959,6 +959,7 @@ wm2_vconf_recalc(const char *ifname, bool force)
+     bool dpp_enabled;
      bool want;
      bool has;
 +    int del_vif = 0;
  
      LOGD("%s: recalculating", ifname);
  
-@@ -797,6 +798,9 @@ wm2_vconf_recalc(const char *ifname, bool force)
+@@ -976,6 +976,9 @@ wm2_vconf_recalc(const char *ifname, bool force)
                                         &vstate)))
          wm2_vstate_init(&vstate, ifname);
  
 +    if (!want)
 +        del_vif = 1;
 +
-     /* This is workaround to deal with unpatched controller.
-      * Having this on device side prevents it from saner 3rd
-      * party gw integrations where currently State needs to
-@@ -889,6 +893,13 @@ wm2_vconf_recalc(const char *ifname, bool force)
-         return;
+     if (want == true) {
+         wm2_l2uf_if_enable(ifname);
+         if (strcmp(vconf.mode, "sta") == 0)
+@@ -1154,6 +1154,13 @@ wm2_vconf_recalc(const char *ifname, bool force)
+         WARN_ON(!ovsdb_table_upsert(&table_Wifi_VIF_State, &vstate, false));
      }
  
 +    if (del_vif) {

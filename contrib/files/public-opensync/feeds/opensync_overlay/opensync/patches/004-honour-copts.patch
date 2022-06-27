@@ -1,8 +1,8 @@
 From: John Crispin <john@phrozen.org>
 Subject: [PATCH] build: Honour COPTS, OWRT_CFLAGS
 
---- a/build/flags.mk
-+++ b/build/flags.mk
+--- a/core/build/flags.mk
++++ b/core/build/flags.mk
 @@ -23,12 +23,13 @@
  # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  

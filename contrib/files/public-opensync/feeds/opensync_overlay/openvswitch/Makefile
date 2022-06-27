@@ -237,6 +237,14 @@ define Package/openvswitch-common/conffiles
 endef
 $(eval $(call OvsPackageTemplate,common))
 
+define Build/InstallDev
+	$(INSTALL_DIR) $(1)/usr/include/openvswitch/lib
+	$(CP) $(PKG_BUILD_DIR)/*.h  $(1)/usr/include/openvswitch
+	$(CP) $(PKG_BUILD_DIR)/lib/*.h  $(1)/usr/include/openvswitch/lib
+	$(CP) $(PKG_BUILD_DIR)/include/*  $(1)/usr/include/openvswitch
+	$(INSTALL_DIR) $(1)/usr/lib/
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libopenvswitch*.so*  $(1)/usr/lib/
+endef
 
 # coreutils-sleep is required by ovs-lib for sleeping a fraction of second
 #

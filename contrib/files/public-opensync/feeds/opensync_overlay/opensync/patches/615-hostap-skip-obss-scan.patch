@@ -2,25 +2,30 @@ From: aparna.salian <aparna.salian@globaledgesoft.com>
 Subject: [PATCH] lib/hostap: Enable hostapd config option to 
 skip initial obss scan
 
---- a/src/lib/hostap/inc/opensync-hapd.h
-+++ b/src/lib/hostap/inc/opensync-hapd.h
-@@ -43,6 +43,7 @@ struct hapd {
+--- a/core/src/lib/hostap/inc/opensync-hapd.h
++++ b/core/src/lib/hostap/inc/opensync-hapd.h
+@@ -44,6 +44,7 @@ struct hapd {
+     int ieee80211ax;
      char htcaps[256];
      char vhtcaps[512];
-     char country[32];
 +    int noscan; /* skip initial obss scan */
      void (*sta_connected)(struct hapd *hapd, const char *mac, const char *keyid);
      void (*sta_disconnected)(struct hapd *hapd, const char *mac);
      void (*ap_enabled)(struct hapd *hapd);
---- a/src/lib/hostap/src/hapd.c
-+++ b/src/lib/hostap/src/hapd.c
-@@ -670,6 +670,9 @@ hapd_conf_gen(struct hapd *hapd,
+--- a/core/src/lib/hostap/src/hapd.c
++++ b/core/src/lib/hostap/src/hapd.c
+@@ -1141,10 +1141,13 @@ hapd_conf_gen(struct hapd *hapd,
+ 
+     if (vconf->group_rekey_exists && vconf->group_rekey >= 0)
+         csnprintf(&buf, &len, "wpa_group_rekey=%d\n", vconf->group_rekey);
+-    
++
      if (rconf->bcn_int_exists)
          csnprintf(&buf, &len, "beacon_int=%d\n", rconf->bcn_int);
  
 +    if (hapd->noscan)
 +        csnprintf(&buf, &len, "noscan=1\n");
 +
-     WARN_ON(len == 1); /* likely buf was truncated */
- 
-     return hapd_conf_gen_psk(hapd, vconf);
+     if (vconf->wpa_exists)
+         return hapd_conf_gen_security(hapd, buf, &len, vconf);
+     else

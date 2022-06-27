@@ -1,9 +1,9 @@
 From: aparna.salian <aparna.salian@globaledgesoft.com>
 Subject: [PATCH] lib/hostap: Callbacks added for hostapd DFS events
 
---- a/src/lib/hostap/inc/opensync-hapd.h
-+++ b/src/lib/hostap/inc/opensync-hapd.h
-@@ -55,6 +55,11 @@ struct hapd {
+--- a/core/src/lib/hostap/inc/opensync-hapd.h
++++ b/core/src/lib/hostap/inc/opensync-hapd.h
+@@ -57,6 +57,11 @@ struct hapd {
      void (*cmd_frame_probe_req)(struct hapd *hapd, const char *event);
      void (*cmd_frame_action)(struct hapd *hapd, const char *event);
      void (*cmd_frame_disconnect)(struct hapd *hapd, const char *event);
@@ -15,9 +15,9 @@ Subject: [PATCH] lib/hostap: Callbacks added for hostapd DFS events
      struct ctrl ctrl;
  };
  
---- a/src/lib/hostap/src/hapd.c
-+++ b/src/lib/hostap/src/hapd.c
-@@ -214,6 +214,36 @@ hapd_ctrl_cb(struct ctrl *ctrl, int leve
+--- a/core/src/lib/hostap/src/hapd.c
++++ b/core/src/lib/hostap/src/hapd.c
+@@ -249,6 +249,36 @@ hapd_ctrl_cb(struct ctrl *ctrl, int leve
          return;
      }
  

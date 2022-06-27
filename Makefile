@@ -4,8 +4,8 @@ PATCHED ?= y
 CONFIGS = $(shell ls config | grep -F -- .config | cut -d. -f1)
 
 CACHE_DIR = .cache.$(CONFIG)
-CACHE_OLD = $(CACHE_DIR)/.cache_old
-CACHE_NOW = .cache_current
+CACHE_OLD = $(CACHE_DIR)/.cache_old.$(CONFIG)
+CACHE_NOW = .cache_current.$(CONFIG)
 SDK_REPO=https://github.com/openwrt/openwrt.git
 BUILD_NUMBER ?= 0
 IMAGE_DEPLOYMENT_PROFILE ?= local
@@ -52,7 +52,7 @@ help: ## this help message
 	@echo 'Available make targets are:'
 	@awk -F ':|##' '/^[^\t].+?:.*?##/ {printf "    %-23s %s\n", $$1, $$NF}' $(MAKEFILE_LIST)
 	@echo
-	@echo "Examples:"
+	@echo 'Examples:'
 	@echo "    docker/dock-run make CONFIG=mr8300 OPENSYNC_SRC=<path_to_opensync_root> build"
 	@echo "    docker/dock-run make CONFIG=mr8300 OPENSYNC_SRC=<path_to_opensync_root> IMAGE_DEPLOYMENT_PROFILE=opensync-dev build"
 	@echo "    docker/dock-run make CONFIG=mr8300 OPENSYNC_SRC=<path_to_opensync_root> compile/opensync"
@@ -60,11 +60,19 @@ help: ## this help message
 	@echo "    docker/dock-run make CONFIG=mr8300 OPENSYNC_SRC=<path_to_opensync_root> compile"
 	@echo "    docker/dock-run make cleanold"
 	@echo
+	@echo "After you do a full build, you can also run various make commands {clean, compile, install or other goal}) for any package from top Makefile:"
+	@echo "    make CONFIG=mr8300 package/libs/libnl/clean"
+	@echo "    make CONFIG=mr8300 package/libs/libnl/compile"
+	@echo "or:"
+	@echo "    make CONFIG=mr8300 package/libs/libnl/{clean,compile} V=s -j1"
+	@echo "or with the use of auto-complete:"
+	@echo "    make CONFIG=mr8300 build-mr8300/openwrt/package/libs/libnl/{clean,compile} V=s -j1"
+	@echo
 
 build: ## prepare and build a 'CONFIG=<config> OPENSYNC_SRC=~/path/to/opensync [IMAGE_DEPLOYMENT_PROFILE=<profile>]' in build-<config> directory
 	make prepare
 	make compile
-	make image BUILD_NUMBER=$(BUILD_NUMBER)
+	make image
 
 prepare: ## prepare a 'CONFIG=<config>' (sdk, config, and feeds)
 	find ./contrib -type f | xargs md5sum > $(CACHE_NOW) && md5sum config/$(CONFIG).mk >> $(CACHE_NOW)
@@ -74,11 +82,15 @@ prepare: ## prepare a 'CONFIG=<config>' (sdk, config, and feeds)
 $(BUILD): $(shell find config contrib) Makefile.$(OPENWRT_REFBOARD).mk Makefile
 	rm -rf .$(BUILD)
 	cp -a $(CACHE_DIR) .$(BUILD)
-	make $(CONF_PROFILE) CONFIG=$(CONFIG)
+	make setconfig CONFIG=$(CONFIG)
 	make backup
 	mv .$(BUILD) $(BUILD)
 
-backup: ## back up a 'CONFIG=<config>' (add .old.<date> suffix to the directory name)
+setconfig: ## (internal)
+	cp contrib/config/*/$(CONFIG).config .$(BUILD)/openwrt/.config
+	make -C .$(BUILD)/openwrt defconfig
+
+backup: ## back up a CONFIG=<config> (add .old.<date> suffix to the directory name)
 	! test -e $(BUILD) || mv -f $(BUILD) $(BUILD).old.$(shell date +%Y-%m-%d-%H-%M-%S)
 
 cache: ## (internal)
@@ -109,7 +121,7 @@ patch: ## (internal; apply contrib/ to build dir)
 	STOW_PKGS="$(call _FIND_SERIES_DIRS,contrib/files/)"; \
 		echo stowing: $$STOW_PKGS; \
 		for D in $$STOW_PKGS; do find contrib/files/$$D -not -type d -printf "$(CACHE_DIR)/openwrt/%P\n" | xargs rm -vf; done; \
-		[ -z "$$STOW_PKGS" ] || stow -t $(CACHE_DIR)/openwrt -d contrib/files --no-folding -R $$STOW_PKGS
+		[ -z "$$STOW_PKGS" ] || for D in $$STOW_PKGS; do cp -ar contrib/files/$$D/* $(CACHE_DIR)/openwrt/; done
 
 	# Patches are copied so if there are some changes in $(CACHE_DIR)/
 	# it is safe to checkout a different commit in git and CACHE_DIR it.
@@ -144,13 +156,24 @@ update: ## copy quilt patches from build-<config> build dir to contrib/patches/
 	done; done
 
 compile: ## compile a 'CONFIG=<config> OPENSYNC_SRC=<path_to_opensync_root> [IMAGE_DEPLOYMENT_PROFILE=<profile>]' in build-<config>/openwrt directory
+	test "$(BUILD_NUMBER)" = 0 || make purge/opensync
 	make -C $(BUILD)/openwrt -j $(JOBS)
 
-compile/opensync: ## clean and compile OpenSync with 'CONFIG=<config> OPENSYNC_SRC=<path_to_opensync_root> [IMAGE_DEPLOYMENT_PROFILE=<profile>]' in build-<config>/openwrt directory
+purge/opensync: ## purge opensync from system
+	echo purge opensync
+	rm -rf $(BUILD)/openwrt/build_dir/target-*/opensync-*
+
+compile/opensync: ## clean and compile opensync with a 'CONFIG=<config> OPENSYNC_SRC=<path_to_opensync_root> [IMAGE_DEPLOYMENT_PROFILE=<profile>]' in build-<config>/openwrt directory
 	make -C $(BUILD)/openwrt -j1 package/opensync/clean
 	make -C $(BUILD)/openwrt -j1 package/opensync/compile
 
-clean: ## remove build-<config> build dir
+$(BUILD)/%: ## make package from topdir
+	make -C $(BUILD)/openwrt $(subst $(BUILD)/openwrt/,,$@)
+
+package/%: ## make package
+	make -C $(BUILD)/openwrt $@
+
+clean: ## remove CONFIG='s build dir
 	rm -rf $(BUILD) .$(BUILD)
 
 cleanold: ## remove all old (automatically renamed) build dirs
@@ -163,6 +186,5 @@ cleancache: ## remove cached local clones of OpenWrt and default feeds repositor
 cleanall: ## remove all build dirs, caches and .cache_current
 	rm -rf build*/ .build*/ build* .build* .cache*
 
-.PHONY: cache/clean sdk-assemble feeds-default-use-cache feeds patch
-.PHONY: update backup prepare compile compile/opensync compile/wrap build
-.PHONY: clean cleanold cache cleancache cleanall
+.PHONY: help build prepare setconfig backup cache feeds patch update compile
+.PHONY: compile/opensync package clean cleanold cleancache cleanall

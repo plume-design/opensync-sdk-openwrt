@@ -1,0 +1,26 @@
+Index: dnsmasq-2.83/src/dns-protocol.h
+===================================================================
+--- dnsmasq-2.83.orig/src/dns-protocol.h
++++ dnsmasq-2.83/src/dns-protocol.h
+@@ -35,6 +35,7 @@
+ #define REFUSED		5		/* query refused */
+ 
+ #define QUERY           0               /* opcode */
++#define SERVER_STATUS   2               /* opcode */
+ 
+ #define C_IN            1               /* the arpa internet */
+ #define C_CHAOS         3               /* for chaos net (MIT) */
+Index: dnsmasq-2.83/src/forward.c
+===================================================================
+--- dnsmasq-2.83.orig/src/forward.c
++++ dnsmasq-2.83/src/forward.c
+@@ -1343,7 +1343,8 @@ void receive_query(struct listener *list
+   
+   if (n < (int)sizeof(struct dns_header) || 
+       (msg.msg_flags & MSG_TRUNC) ||
+-      (header->hb3 & HB3_QR))
++      (header->hb3 & HB3_QR) ||
++      (OPCODE(header) == SERVER_STATUS))
+     return;
+ 
+   /* Clear buffer beyond request to avoid risk of

@@ -1,9 +1,9 @@
 From: aparna.salian <aparna.salian@globaledgesoft.com>
 Subject: [PATCH] lib/hostap: Callback added for AP_CSA_FINISHED event
 
---- a/src/lib/hostap/inc/opensync-hapd.h
-+++ b/src/lib/hostap/inc/opensync-hapd.h
-@@ -60,6 +60,7 @@ struct hapd {
+--- a/core/src/lib/hostap/inc/opensync-hapd.h
++++ b/core/src/lib/hostap/inc/opensync-hapd.h
+@@ -62,6 +62,7 @@ struct hapd {
      void (*dfs_event_radar_detected)(struct hapd *hapd, const char *event);
      void (*dfs_event_pre_cac_expired)(struct hapd *hapd, const char *event);
      void (*dfs_event_nop_finished)(struct hapd *hapd, const char *event);
@@ -11,9 +11,9 @@ Subject: [PATCH] lib/hostap: Callback added for AP_CSA_FINISHED event
      struct ctrl ctrl;
  };
  
---- a/src/lib/hostap/src/hapd.c
-+++ b/src/lib/hostap/src/hapd.c
-@@ -244,6 +244,12 @@ hapd_ctrl_cb(struct ctrl *ctrl, int leve
+--- a/core/src/lib/hostap/src/hapd.c
++++ b/core/src/lib/hostap/src/hapd.c
+@@ -279,6 +279,12 @@ hapd_ctrl_cb(struct ctrl *ctrl, int leve
              hapd->dfs_event_pre_cac_expired(hapd, args);
      }
  

@@ -1,0 +1,100 @@
+--- a/src/odhcp6c.c
++++ b/src/odhcp6c.c
+@@ -67,6 +67,7 @@ static char *ifname = NULL;
+ 
+ static unsigned int script_sync_delay = 10;
+ static unsigned int script_accu_delay = 1;
++static bool update_lifetimes = true;
+ 
+ static struct odhcp6c_opt opts[] = {
+ 	{ .code = DHCPV6_OPT_CLIENTID, .flags = OPT_INTERNAL | OPT_NO_PASSTHRU, .str = NULL },
+@@ -186,7 +187,7 @@ int main(_unused int argc, char* const a
+ 	unsigned int ra_options = RA_RDNSS_DEFAULT_LIFETIME;
+ 	unsigned int ra_holdoff_interval = RA_MIN_ADV_INTERVAL;
+ 
+-	while ((c = getopt(argc, argv, "S::N:V:P:FB:c:i:r:Ru:Ux:s:kt:m:Lhedp:fav")) != -1) {
++	while ((c = getopt(argc, argv, "S::N:V:P:FB:c:i:r:Ru:Ux:s:kt:m:Lhedp:favQ")) != -1) {
+ 		switch (c) {
+ 		case 'S':
+ 			allow_slaac_only = (optarg) ? atoi(optarg) : -1;
+@@ -386,6 +387,10 @@ int main(_unused int argc, char* const a
+ 			}
+ 			break;
+ 
++		case 'Q':
++			update_lifetimes = false;
++			break;
++
+ 		default:
+ 			help = true;
+ 			break;
+@@ -625,6 +630,7 @@ static int usage(void)
+ 	"	-m <seconds>	Minimum time between accepting RA updates (3)\n"
+ 	"	-L		Ignore default lifetime for RDNSS records\n"
+ 	"	-U		Ignore Server Unicast option\n"
++	"	-Q		Do not track or update address lifetimes\n"
+ 	"\nInvocation options:\n"
+ 	"	-p <pidfile>	Set pidfile (/var/run/odhcp6c.pid)\n"
+ 	"	-d		Daemonize\n"
+@@ -779,13 +785,19 @@ bool odhcp6c_update_entry(enum odhcp6c_s
+ 
+ 	if (new->valid > 0) {
+ 		if (x) {
++			/*
++			 * Always issue a ra-update when odhcp6c is not tracking lifetimes
++			 * (update_lifetimes == false, the -Q option). This ensures that
++			 * Router Advertisement message refresh the lifetimes on the
++			 * assigned IPv6 addresses.
++			 */
+ 			if (holdoff_interval && new->valid >= x->valid &&
+ 					new->valid != UINT32_MAX &&
+ 					new->valid - x->valid < holdoff_interval &&
+ 					new->preferred >= x->preferred &&
+ 					new->preferred != UINT32_MAX &&
+ 					new->preferred - x->preferred < holdoff_interval)
+-				return false;
++				return !update_lifetimes;
+ 
+ 			x->valid = new->valid;
+ 			x->preferred = new->preferred;
+@@ -819,21 +831,25 @@ static void odhcp6c_expire_list(enum odh
+ 		else if (c->t2 != UINT32_MAX)
+ 			c->t2 -= elapsed;
+ 
+-		if (c->preferred < elapsed)
+-			c->preferred = 0;
+-		else if (c->preferred != UINT32_MAX)
+-			c->preferred -= elapsed;
+-
+-		if (c->valid < elapsed)
+-			c->valid = 0;
+-		else if (c->valid != UINT32_MAX)
+-			c->valid -= elapsed;
+-
+-		if (!c->valid) {
+-			odhcp6c_remove_state(state, ((uint8_t*)c) - start, odhcp6c_entry_size(c));
+-			start = odhcp6c_get_state(state, &len);
+-		} else
+-			c = odhcp6c_next_entry(c);
++		if (update_lifetimes)
++		{
++			if (c->preferred < elapsed)
++				c->preferred = 0;
++			else if (c->preferred != UINT32_MAX)
++				c->preferred -= elapsed;
++
++			if (c->valid < elapsed)
++				c->valid = 0;
++			else if (c->valid != UINT32_MAX)
++				c->valid -= elapsed;
++
++			if (!c->valid) {
++				odhcp6c_remove_state(state, ((uint8_t*)c) - start, odhcp6c_entry_size(c));
++				start = odhcp6c_get_state(state, &len);
++				continue;
++			}
++		}
++		c = odhcp6c_next_entry(c);
+ 	}
+ }
+ 

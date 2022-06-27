@@ -10,3 +10,5 @@
 0051-config-firewall-opensync-adaptation.patch
 0052-dnsmasq-opensync-adaptation.patch
 0053-iproute2-opensync-adaptation.patch
+0054-ppp-chap-secrets-adaptation.patch
+0055-busybox-adaptation.patch
